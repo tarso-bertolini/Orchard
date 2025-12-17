@@ -9,7 +9,7 @@
 
 Orchard is a specialized inference engine designed to extract maximum performance from Apple Silicon (M1/M2/M3/M4) chips. By bypassing generic frameworks and targeting the Metal API directly, Orchard achieves state-of-the-art speed and efficiency for local Large Language Model (LLM) inference.
 
-> **"The engine is the car."** — Orchard runs models closer to the metal than ever before.
+> Orchard runs models closer to the metal than ever before.
 
 ---
 
