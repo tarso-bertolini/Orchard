@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools", "wheel", "pybind11"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "orchard"
+version = "0.1.0"
+description = "High-performance LLM runtime for Apple Silicon"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "numpy",
+    "safetensors",
+    "tokenizers"
+]

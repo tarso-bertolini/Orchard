@@ -28,8 +28,16 @@ orchard_core = Extension(
 )
 
 setup(
-    name="orchard_core",
-    version="0.1",
-    description="Orchard Metal Runtime Bindings",
+    name="orchard",
+    version="0.1.0",
+    description="High-performance LLM runtime for Apple Silicon",
+    author="Orchard Team",
+    packages=["orchard"],
     ext_modules=[orchard_core],
+    install_requires=[
+        "numpy",
+        "safetensors",
+        "tokenizers"
+    ],
+    python_requires=">=3.9",
 )

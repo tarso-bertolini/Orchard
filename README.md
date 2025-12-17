@@ -49,7 +49,25 @@ Orchard is a specialized inference engine designed to extract maximum performanc
 
 ## Usage
 
-### Basic Tensor Operations
+### High-Level API (Llama-2)
+
+Orchard provides a high-level Python API to load and run models.
+
+```python
+from orchard import Llama
+
+# Load a model (supports Hugging Face format with safetensors)
+# This will automatically quantize weights to INT4 on load.
+model = Llama("path/to/llama-2-7b-hf")
+
+# Generate text
+output = model.generate("The future of AI is", max_tokens=50)
+print(output)
+```
+
+### Low-Level API (Metal Kernels)
+
+You can also access the raw Metal backend directly:
 
 ```python
 import orchard_core
