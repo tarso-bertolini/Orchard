@@ -40,6 +40,7 @@ setup(
         "tokenizers",
         "huggingface_hub"
     ],
+    include_package_data=True,
     entry_points={
         "console_scripts": [
             "orchard=orchard.cli:main",

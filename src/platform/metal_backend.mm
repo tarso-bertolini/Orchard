@@ -38,76 +38,37 @@ MetalBackend::~MetalBackend() {
     delete pImpl;
 }
 
-void MetalBackend::initialize() {
+void MetalBackend::initialize(const std::string& resource_path) {
     if (!pImpl->device) {
         std::cerr << "Failed to create Metal device" << std::endl;
         return;
     }
 
+    // Helper to read file
+    auto read_file = [&](const std::string& filename) -> std::string {
+        std::string full_path = resource_path + "/" + filename;
+        std::ifstream file(full_path);
+        if (!file.is_open()) {
+            std::cerr << "Failed to open kernel source file: " << full_path << std::endl;
+            return "";
+        }
+        std::stringstream buffer;
+        buffer << file.rdbuf();
+        return buffer.str();
+    };
+
     // Load the library from source
     NSError* error = nil;
     
-    // Read source file
-    std::ifstream file("src/kernels/matmul.metal");
-    if (!file.is_open()) {
-        std::cerr << "Failed to open kernel source file: src/kernels/matmul.metal" << std::endl;
-        return;
-    }
-    std::stringstream buffer;
-    buffer << file.rdbuf();
-    std::string source = buffer.str();
-
-    // Read SIMD kernel source
-    std::ifstream file_simd("src/kernels/matmul_simd.metal");
-    if (!file_simd.is_open()) {
-        std::cerr << "Failed to open kernel source file: src/kernels/matmul_simd.metal" << std::endl;
-        return;
-    }
-    std::stringstream buffer_simd;
-    buffer_simd << file_simd.rdbuf();
-    std::string source_simd = buffer_simd.str();
-
-    // Read RMSNorm kernel source
-    std::ifstream file_rms("src/kernels/rmsnorm.metal");
-    std::stringstream buffer_rms;
-    buffer_rms << file_rms.rdbuf();
-    std::string source_rms = buffer_rms.str();
-
-    // Read RoPE kernel source
-    std::ifstream file_rope("src/kernels/rope.metal");
-    std::stringstream buffer_rope;
-    buffer_rope << file_rope.rdbuf();
-    std::string source_rope = buffer_rope.str();
-
-    // Read GEMV INT8 kernel source
-    std::ifstream file_gemv("src/kernels/gemv_int8.metal");
-    std::stringstream buffer_gemv;
-    buffer_gemv << file_gemv.rdbuf();
-    std::string source_gemv = buffer_gemv.str();
-
-    // Read GEMV INT4 kernel source
-    std::ifstream file_gemv4("src/kernels/gemv_int4.metal");
-    std::stringstream buffer_gemv4;
-    buffer_gemv4 << file_gemv4.rdbuf();
-    std::string source_gemv4 = buffer_gemv4.str();
-
-    // Read Elementwise kernel source
-    std::ifstream file_ew("src/kernels/elementwise.metal");
-    std::stringstream buffer_ew;
-    buffer_ew << file_ew.rdbuf();
-    std::string source_ew = buffer_ew.str();
-
-    // Read Softmax kernel source
-    std::ifstream file_sm("src/kernels/softmax.metal");
-    std::stringstream buffer_sm;
-    buffer_sm << file_sm.rdbuf();
-    std::string source_sm = buffer_sm.str();
-
-    // Read Embedding kernel source
-    std::ifstream file_emb("src/kernels/embedding.metal");
-    std::stringstream buffer_emb;
-    buffer_emb << file_emb.rdbuf();
-    std::string source_emb = buffer_emb.str();
+    std::string source = read_file("matmul.metal");
+    std::string source_simd = read_file("matmul_simd.metal");
+    std::string source_rms = read_file("rmsnorm.metal");
+    std::string source_rope = read_file("rope.metal");
+    std::string source_gemv = read_file("gemv_int8.metal");
+    std::string source_gemv4 = read_file("gemv_int4.metal");
+    std::string source_ew = read_file("elementwise.metal");
+    std::string source_sm = read_file("softmax.metal");
+    std::string source_emb = read_file("embedding.metal");
     
     // Combine sources
     std::string combined_source = source + "\n" + source_simd + "\n" + source_rms + "\n" + source_rope + "\n" + source_gemv + "\n" + source_gemv4 + "\n" + source_ew + "\n" + source_sm + "\n" + source_emb;
@@ -475,7 +436,7 @@ void MetalBackend::run_softmax(void* input, void* output, uint32_t rows, uint32_
     MTLSize gridSize = MTLSizeMake(1024, rows, 1); // Assuming blockDim=1024
     MTLSize threadgroupSize = MTLSizeMake(1024, 1, 1);
     
-    [computeEncoder dispatchThreadgroups:MTLSizeMake(1, rows, 1) threadsPerThreadgroup:threadgroupSize];
+    [computeEncoder dispatchThreadgroups:MTLSizeMake(rows, 1, 1) threadsPerThreadgroup:threadgroupSize];
     [computeEncoder endEncoding];
     [commandBuffer commit];
     [commandBuffer waitUntilCompleted];

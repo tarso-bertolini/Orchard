@@ -11,7 +11,7 @@ public:
     MetalBackend();
     ~MetalBackend();
 
-    void initialize();
+    void initialize(const std::string& resource_path);
     bool is_available() const;
     std::string get_device_name() const;
 

@@ -13,7 +13,7 @@ PYBIND11_MODULE(orchard_core, m) {
     // MetalBackend
     py::class_<MetalBackend>(m, "MetalBackend")
         .def(py::init<>())
-        .def("initialize", &MetalBackend::initialize)
+        .def("initialize", &MetalBackend::initialize, py::arg("resource_path"))
         .def("is_available", &MetalBackend::is_available)
         .def("get_device_name", &MetalBackend::get_device_name)
         // Expose raw kernels with Tensor wrappers
