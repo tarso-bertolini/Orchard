@@ -1,4 +1,4 @@
-# 🍎 Orchard
+# Orchard
 
 **The High-Performance LLM Runtime for Apple Silicon.**
 
@@ -13,17 +13,17 @@ Orchard is a specialized inference engine designed to extract maximum performanc
 
 ---
 
-## 🚀 Key Features
+## Key Features
 
-*   **🍏 Apple Silicon Native**: Built directly on Metal (Objective-C++) for zero-overhead GPU access. No PyTorch, no TensorFlow, just raw compute.
-*   **⚡️ 4-bit Quantization**: Custom `INT4` kernels allow running massive models on consumer hardware (e.g., 7B models on 8GB RAM).
-*   **🏎️ Blazing Fast**: Up to **82x faster** than CPU inference for quantized workloads.
-*   **📦 Zero-Copy Architecture**: Unified memory architecture is fully exploited—CPU and GPU share memory pointers where possible.
-*   **🐍 Pythonic Control**: A lightweight, high-level Python API controls the heavy lifting done in C++.
+*   **Apple Silicon Native**: Built directly on Metal (Objective-C++) for zero-overhead GPU access. No PyTorch, no TensorFlow, just raw compute.
+*   **4-bit Quantization**: Custom `INT4` kernels allow running massive models on consumer hardware (e.g., 7B models on 8GB RAM).
+*   **Blazing Fast**: Up to **82x faster** than CPU inference for quantized workloads.
+*   **Zero-Copy Architecture**: Unified memory architecture is fully exploited—CPU and GPU share memory pointers where possible.
+*   **Pythonic Control**: A lightweight, high-level Python API controls the heavy lifting done in C++.
 
 ---
 
-## 🛠️ Installation
+## Installation
 
 ### Prerequisites
 *   **macOS 13.0+** (Ventura or later)
@@ -48,7 +48,7 @@ pip install .
 
 ---
 
-## 💻 CLI Usage
+## CLI Usage
 
 Orchard comes with a powerful CLI to manage your local AI environment.
 
@@ -78,7 +78,7 @@ orchard run --model models/Llama-2-7b-chat-opt --prompt "Explain quantum computi
 
 ---
 
-## 🐍 Python API
+## Python API
 
 Integrate Orchard into your own applications with just a few lines of code.
 
@@ -100,7 +100,7 @@ model.generate(
 
 ---
 
-## 📊 Performance Benchmarks
+## Performance Benchmarks
 
 **Device:** Apple M2 (Unified Memory)
 
@@ -109,13 +109,13 @@ model.generate(
 | **Matrix Mul (FP32)** | NumPy (CPU) | 15.15 ms | 1.0x |
 | **Matrix Mul (FP32)** | Metal (GPU) | 26.82 ms | 0.6x (Overhead bound) |
 | **Llama Layer (INT4)** | NumPy (FP16) | 34.58 ms | 1.0x |
-| **Llama Layer (INT4)** | **Orchard (Metal)** | **0.42 ms** | **82.3x 🚀** |
+| **Llama Layer (INT4)** | **Orchard (Metal)** | **0.42 ms** | **82.3x** |
 
 *See [BENCHMARKS.md](docs/BENCHMARKS.md) for the full report.*
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 Orchard uses a hybrid execution model to balance flexibility and performance.
 
@@ -146,7 +146,7 @@ graph TD
 
 ---
 
-## 🗺️ Roadmap
+## Roadmap
 
 - [x] **Phase 1: Metal Viability** (Kernels for MatMul, Softmax, RMSNorm)
 - [x] **Phase 2: Runtime Core** (C++ Backend, Tensor Abstraction)
@@ -156,7 +156,7 @@ graph TD
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 Orchard is an open exploration of high-performance computing on Apple Silicon. Contributions, issues, and PRs are welcome!
 
@@ -168,10 +168,10 @@ Orchard is an open exploration of high-performance computing on Apple Silicon. C
 
 ---
 
-## 📜 License
+## License
 
 MIT License. See [LICENSE](LICENSE) for details.
 
 ---
 
-*Built with 🍎 in Cupertino (and beyond).*
+*Built in Cupertino (and beyond).*
