@@ -37,7 +37,13 @@ setup(
     install_requires=[
         "numpy",
         "safetensors",
-        "tokenizers"
+        "tokenizers",
+        "huggingface_hub"
     ],
+    entry_points={
+        "console_scripts": [
+            "orchard=orchard.cli:main",
+        ],
+    },
     python_requires=">=3.9",
 )

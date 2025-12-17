@@ -43,7 +43,25 @@ Orchard is a specialized inference engine designed to extract maximum performanc
 4.  **Build the extension:**
     ```bash
     python3 setup.py build_ext --inplace
+    pip install -e .
     ```
+
+---
+
+## CLI Usage
+
+Orchard comes with a built-in CLI tool to manage models and check system compatibility.
+
+```bash
+# Check system specs
+orchard info
+
+# Download recommended models
+orchard download
+
+# Run a model
+orchard run --model models/Llama-2-7b-chat
+```
 
 ---
 
