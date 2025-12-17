@@ -34,6 +34,21 @@ PYBIND11_MODULE(orchard_core, m) {
         })
         .def("run_gemv_q4_0", [](MetalBackend& self, Tensor& weights, Tensor& scales, Tensor& input, Tensor& output, uint32_t K, uint32_t N) {
             self.run_gemv_q4_0(weights.data(), scales.data(), input.data(), output.data(), K, N);
+        })
+        .def("run_add", [](MetalBackend& self, Tensor& a, Tensor& b, Tensor& c, uint32_t size) {
+            self.run_add(a.data(), b.data(), c.data(), size);
+        })
+        .def("run_mul", [](MetalBackend& self, Tensor& a, Tensor& b, Tensor& c, uint32_t size) {
+            self.run_mul(a.data(), b.data(), c.data(), size);
+        })
+        .def("run_silu", [](MetalBackend& self, Tensor& in, Tensor& out, uint32_t size) {
+            self.run_silu(in.data(), out.data(), size);
+        })
+        .def("run_softmax", [](MetalBackend& self, Tensor& input, Tensor& output, uint32_t rows, uint32_t cols) {
+            self.run_softmax(input.data(), output.data(), rows, cols);
+        })
+        .def("run_embedding", [](MetalBackend& self, Tensor& input_ids, Tensor& weights, Tensor& output, uint32_t num_tokens, uint32_t hidden_dim) {
+            self.run_embedding(input_ids.data(), weights.data(), output.data(), num_tokens, hidden_dim);
         });
 
     // DType

@@ -18,6 +18,11 @@ struct MetalBackend::Impl {
     id<MTLComputePipelineState> ropePSO;
     id<MTLComputePipelineState> gemvInt8PSO;
     id<MTLComputePipelineState> gemvInt4PSO;
+    id<MTLComputePipelineState> addPSO;
+    id<MTLComputePipelineState> mulPSO;
+    id<MTLComputePipelineState> siluPSO;
+    id<MTLComputePipelineState> softmaxPSO;
+    id<MTLComputePipelineState> embeddingPSO;
 
     Impl() {
         device = MTLCreateSystemDefaultDevice();
@@ -85,9 +90,27 @@ void MetalBackend::initialize() {
     std::stringstream buffer_gemv4;
     buffer_gemv4 << file_gemv4.rdbuf();
     std::string source_gemv4 = buffer_gemv4.str();
+
+    // Read Elementwise kernel source
+    std::ifstream file_ew("src/kernels/elementwise.metal");
+    std::stringstream buffer_ew;
+    buffer_ew << file_ew.rdbuf();
+    std::string source_ew = buffer_ew.str();
+
+    // Read Softmax kernel source
+    std::ifstream file_sm("src/kernels/softmax.metal");
+    std::stringstream buffer_sm;
+    buffer_sm << file_sm.rdbuf();
+    std::string source_sm = buffer_sm.str();
+
+    // Read Embedding kernel source
+    std::ifstream file_emb("src/kernels/embedding.metal");
+    std::stringstream buffer_emb;
+    buffer_emb << file_emb.rdbuf();
+    std::string source_emb = buffer_emb.str();
     
     // Combine sources
-    std::string combined_source = source + "\n" + source_simd + "\n" + source_rms + "\n" + source_rope + "\n" + source_gemv + "\n" + source_gemv4;
+    std::string combined_source = source + "\n" + source_simd + "\n" + source_rms + "\n" + source_rope + "\n" + source_gemv + "\n" + source_gemv4 + "\n" + source_ew + "\n" + source_sm + "\n" + source_emb;
     
     NSString* librarySource = [NSString stringWithUTF8String:combined_source.c_str()];
     MTLCompileOptions* options = [[MTLCompileOptions alloc] init];
@@ -147,6 +170,32 @@ void MetalBackend::initialize() {
     id<MTLFunction> kernelFunctionGemv4 = [library newFunctionWithName:@"gemv_q4_0"];
     if (kernelFunctionGemv4) {
         pImpl->gemvInt4PSO = [pImpl->device newComputePipelineStateWithFunction:kernelFunctionGemv4 error:&error];
+    }
+
+    // Load Elementwise Kernels
+    id<MTLFunction> kernelFunctionAdd = [library newFunctionWithName:@"add_fp16"];
+    if (kernelFunctionAdd) {
+        pImpl->addPSO = [pImpl->device newComputePipelineStateWithFunction:kernelFunctionAdd error:&error];
+    }
+    id<MTLFunction> kernelFunctionMul = [library newFunctionWithName:@"mul_fp16"];
+    if (kernelFunctionMul) {
+        pImpl->mulPSO = [pImpl->device newComputePipelineStateWithFunction:kernelFunctionMul error:&error];
+    }
+    id<MTLFunction> kernelFunctionSilu = [library newFunctionWithName:@"silu_fp16"];
+    if (kernelFunctionSilu) {
+        pImpl->siluPSO = [pImpl->device newComputePipelineStateWithFunction:kernelFunctionSilu error:&error];
+    }
+
+    // Load Softmax Kernel
+    id<MTLFunction> kernelFunctionSoftmax = [library newFunctionWithName:@"softmax_fp16"];
+    if (kernelFunctionSoftmax) {
+        pImpl->softmaxPSO = [pImpl->device newComputePipelineStateWithFunction:kernelFunctionSoftmax error:&error];
+    }
+
+    // Load Embedding Kernel
+    id<MTLFunction> kernelFunctionEmb = [library newFunctionWithName:@"embedding_forward"];
+    if (kernelFunctionEmb) {
+        pImpl->embeddingPSO = [pImpl->device newComputePipelineStateWithFunction:kernelFunctionEmb error:&error];
     }
 }
 
@@ -362,6 +411,92 @@ void MetalBackend::run_gemv_q4_0(void* weights, void* scales, void* input, void*
     [computeEncoder dispatchThreads:gridSize threadsPerThreadgroup:threadgroupSize];
     [computeEncoder endEncoding];
 
+    [commandBuffer commit];
+    [commandBuffer waitUntilCompleted];
+}
+
+void MetalBackend::run_add(void* a, void* b, void* c, uint32_t size) {
+    if (!pImpl->commandQueue || !pImpl->addPSO) return;
+    id<MTLCommandBuffer> commandBuffer = [pImpl->commandQueue commandBuffer];
+    id<MTLComputeCommandEncoder> computeEncoder = [commandBuffer computeCommandEncoder];
+    [computeEncoder setComputePipelineState:pImpl->addPSO];
+    [computeEncoder setBuffer:(__bridge id<MTLBuffer>)a offset:0 atIndex:0];
+    [computeEncoder setBuffer:(__bridge id<MTLBuffer>)b offset:0 atIndex:1];
+    [computeEncoder setBuffer:(__bridge id<MTLBuffer>)c offset:0 atIndex:2];
+    MTLSize gridSize = MTLSizeMake(size, 1, 1);
+    MTLSize threadgroupSize = MTLSizeMake(std::min(size, 1024u), 1, 1);
+    [computeEncoder dispatchThreads:gridSize threadsPerThreadgroup:threadgroupSize];
+    [computeEncoder endEncoding];
+    [commandBuffer commit];
+    [commandBuffer waitUntilCompleted];
+}
+
+void MetalBackend::run_mul(void* a, void* b, void* c, uint32_t size) {
+    if (!pImpl->commandQueue || !pImpl->mulPSO) return;
+    id<MTLCommandBuffer> commandBuffer = [pImpl->commandQueue commandBuffer];
+    id<MTLComputeCommandEncoder> computeEncoder = [commandBuffer computeCommandEncoder];
+    [computeEncoder setComputePipelineState:pImpl->mulPSO];
+    [computeEncoder setBuffer:(__bridge id<MTLBuffer>)a offset:0 atIndex:0];
+    [computeEncoder setBuffer:(__bridge id<MTLBuffer>)b offset:0 atIndex:1];
+    [computeEncoder setBuffer:(__bridge id<MTLBuffer>)c offset:0 atIndex:2];
+    MTLSize gridSize = MTLSizeMake(size, 1, 1);
+    MTLSize threadgroupSize = MTLSizeMake(std::min(size, 1024u), 1, 1);
+    [computeEncoder dispatchThreads:gridSize threadsPerThreadgroup:threadgroupSize];
+    [computeEncoder endEncoding];
+    [commandBuffer commit];
+    [commandBuffer waitUntilCompleted];
+}
+
+void MetalBackend::run_silu(void* in, void* out, uint32_t size) {
+    if (!pImpl->commandQueue || !pImpl->siluPSO) return;
+    id<MTLCommandBuffer> commandBuffer = [pImpl->commandQueue commandBuffer];
+    id<MTLComputeCommandEncoder> computeEncoder = [commandBuffer computeCommandEncoder];
+    [computeEncoder setComputePipelineState:pImpl->siluPSO];
+    [computeEncoder setBuffer:(__bridge id<MTLBuffer>)in offset:0 atIndex:0];
+    [computeEncoder setBuffer:(__bridge id<MTLBuffer>)out offset:0 atIndex:1];
+    MTLSize gridSize = MTLSizeMake(size, 1, 1);
+    MTLSize threadgroupSize = MTLSizeMake(std::min(size, 1024u), 1, 1);
+    [computeEncoder dispatchThreads:gridSize threadsPerThreadgroup:threadgroupSize];
+    [computeEncoder endEncoding];
+    [commandBuffer commit];
+    [commandBuffer waitUntilCompleted];
+}
+
+void MetalBackend::run_softmax(void* input, void* output, uint32_t rows, uint32_t cols) {
+    if (!pImpl->commandQueue || !pImpl->softmaxPSO) return;
+    id<MTLCommandBuffer> commandBuffer = [pImpl->commandQueue commandBuffer];
+    id<MTLComputeCommandEncoder> computeEncoder = [commandBuffer computeCommandEncoder];
+    [computeEncoder setComputePipelineState:pImpl->softmaxPSO];
+    [computeEncoder setBuffer:(__bridge id<MTLBuffer>)input offset:0 atIndex:0];
+    [computeEncoder setBuffer:(__bridge id<MTLBuffer>)output offset:0 atIndex:1];
+    [computeEncoder setBytes:&cols length:sizeof(uint32_t) atIndex:2];
+    
+    // 1 threadgroup per row
+    MTLSize gridSize = MTLSizeMake(1024, rows, 1); // Assuming blockDim=1024
+    MTLSize threadgroupSize = MTLSizeMake(1024, 1, 1);
+    
+    [computeEncoder dispatchThreadgroups:MTLSizeMake(1, rows, 1) threadsPerThreadgroup:threadgroupSize];
+    [computeEncoder endEncoding];
+    [commandBuffer commit];
+    [commandBuffer waitUntilCompleted];
+}
+
+void MetalBackend::run_embedding(void* input_ids, void* weights, void* output, uint32_t num_tokens, uint32_t hidden_dim) {
+    if (!pImpl->commandQueue || !pImpl->embeddingPSO) return;
+    id<MTLCommandBuffer> commandBuffer = [pImpl->commandQueue commandBuffer];
+    id<MTLComputeCommandEncoder> computeEncoder = [commandBuffer computeCommandEncoder];
+    [computeEncoder setComputePipelineState:pImpl->embeddingPSO];
+    [computeEncoder setBuffer:(__bridge id<MTLBuffer>)input_ids offset:0 atIndex:0];
+    [computeEncoder setBuffer:(__bridge id<MTLBuffer>)weights offset:0 atIndex:1];
+    [computeEncoder setBuffer:(__bridge id<MTLBuffer>)output offset:0 atIndex:2];
+    [computeEncoder setBytes:&hidden_dim length:sizeof(uint32_t) atIndex:3];
+    
+    uint32_t total_elements = num_tokens * hidden_dim;
+    MTLSize gridSize = MTLSizeMake(total_elements, 1, 1);
+    MTLSize threadgroupSize = MTLSizeMake(std::min(total_elements, 1024u), 1, 1);
+    
+    [computeEncoder dispatchThreads:gridSize threadsPerThreadgroup:threadgroupSize];
+    [computeEncoder endEncoding];
     [commandBuffer commit];
     [commandBuffer waitUntilCompleted];
 }

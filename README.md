@@ -67,7 +67,7 @@ print(output)
 
 ### Low-Level API (Metal Kernels)
 
-You can also access the raw Metal backend directly:
+You can also access the raw Metal backend directly. Orchard now exposes a full suite of kernels required for LLM inference:
 
 ```python
 import orchard_core
@@ -79,7 +79,7 @@ backend.initialize()
 
 print(f"Running on: {backend.get_device_name()}")
 
-# Create tensors on GPU
+# --- Matrix Multiplication ---
 M, N, K = 1024, 1024, 1024
 t_a = orchard_core.Tensor(backend, [M, K], orchard_core.DType.Float32)
 t_b = orchard_core.Tensor(backend, [K, N], orchard_core.DType.Float32)
@@ -91,6 +91,20 @@ t_a.copy_from_host(data_a)
 
 # Run Matrix Multiplication
 backend.run_matmul(t_a, t_b, t_c, M, N, K)
+
+# --- Element-wise Operations ---
+# Add: C = A + B
+backend.run_add(t_a, t_b, t_c, M*K)
+
+# Mul: C = A * B
+backend.run_mul(t_a, t_b, t_c, M*K)
+
+# SiLU Activation: Out = In * Sigmoid(In)
+backend.run_silu(t_a, t_c, M*K)
+
+# --- Softmax ---
+# Softmax along the last dimension
+backend.run_softmax(t_a, t_c, M, K)
 
 # Get results back
 result = np.zeros((M, N), dtype=np.float32)

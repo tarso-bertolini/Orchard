@@ -39,6 +39,13 @@ public:
     void run_gemv_q4_0(void* weights, void* scales, void* input, void* output, 
                       uint32_t K, uint32_t N);
 
+    // Element-wise ops
+    void run_add(void* a, void* b, void* c, uint32_t size);
+    void run_mul(void* a, void* b, void* c, uint32_t size);
+    void run_silu(void* in, void* out, uint32_t size);
+    void run_softmax(void* input, void* output, uint32_t rows, uint32_t cols);
+    void run_embedding(void* input_ids, void* weights, void* output, uint32_t num_tokens, uint32_t hidden_dim);
+
 private:
     struct Impl;
     Impl* pImpl;
