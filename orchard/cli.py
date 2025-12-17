@@ -117,6 +117,11 @@ def main():
     run_parser.add_argument("--model", type=str, required=True, help="Path to model directory")
     run_parser.add_argument("--prompt", type=str, default="Hello, how are you?", help="Initial prompt")
     
+    # Optimize command
+    optimize_parser = subparsers.add_parser("optimize", help="Optimize (quantize) a model for faster loading")
+    optimize_parser.add_argument("--model", type=str, required=True, help="Path to source model directory")
+    optimize_parser.add_argument("--output", type=str, required=True, help="Path to output directory")
+
     args = parser.parse_args()
     
     if args.command == "info":
@@ -130,13 +135,26 @@ def main():
     elif args.command == "download":
         download_model_interactive()
         
+    elif args.command == "optimize":
+        try:
+            from orchard.optimizer import optimize_model
+            optimize_model(args.model, args.output)
+        except Exception as e:
+            print(f"Error optimizing model: {e}")
+            import traceback
+            traceback.print_exc()
+
     elif args.command == "run":
         print(f"Loading model from {args.model}...")
-        # Here we would hook into the actual Orchard runtime
-        # from orchard import Llama
-        # model = Llama(args.model)
-        # print(model.generate(args.prompt))
-        print("Model loading logic to be connected.")
+        try:
+            from orchard.model import Llama
+            model = Llama(args.model)
+            print(f"\nGenerating response to: '{args.prompt}'\n")
+            model.generate(args.prompt)
+        except Exception as e:
+            print(f"Error running model: {e}")
+            import traceback
+            traceback.print_exc()
         
     else:
         parser.print_help()

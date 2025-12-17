@@ -34,62 +34,85 @@ def load_weights(model, model_path):
         with safe_open(file, framework="numpy", device="cpu") as f:
             keys = f.keys()
             for key in keys:
+                if key.endswith("_scales"):
+                    continue # Handled by _packed
+                
                 # Parse key to find layer and type
                 # e.g. model.layers.0.self_attn.q_proj.weight
                 parts = key.split('.')
+                is_packed = key.endswith("_packed")
                 
                 if parts[0] == "model" and parts[1] == "layers":
                     layer_idx = int(parts[2])
                     layer = model.layers[layer_idx]
                     module = parts[3] # self_attn or mlp or input_layernorm
                     
-                    tensor = f.get_tensor(key)
-                    
-                    # Quantize and Load
-                    if module == "self_attn":
-                        proj = parts[4] # q_proj, k_proj, v_proj, o_proj
-                        if proj == "q_proj":
-                            w, s = _quantize_and_upload(model.backend, tensor)
-                            layer.wq_w = w; layer.wq_s = s
-                        elif proj == "k_proj":
-                            w, s = _quantize_and_upload(model.backend, tensor)
-                            layer.wk_w = w; layer.wk_s = s
-                        elif proj == "v_proj":
-                            w, s = _quantize_and_upload(model.backend, tensor)
-                            layer.wv_w = w; layer.wv_s = s
-                        elif proj == "o_proj":
-                            w, s = _quantize_and_upload(model.backend, tensor)
-                            layer.wo_w = w; layer.wo_s = s
-                            
-                    elif module == "mlp":
+                    if module == "self_attn" or module == "mlp":
                         proj = parts[4]
-                        if proj == "gate_proj":
-                            w, s = _quantize_and_upload(model.backend, tensor)
-                            layer.w1_w = w; layer.w1_s = s
-                        elif proj == "up_proj":
-                            w, s = _quantize_and_upload(model.backend, tensor)
-                            layer.w3_w = w; layer.w3_s = s
-                        elif proj == "down_proj":
-                            w, s = _quantize_and_upload(model.backend, tensor)
-                            layer.w2_w = w; layer.w2_s = s
+                        target_w, target_s = None, None
+                        
+                        if module == "self_attn":
+                            if proj == "q_proj": target_w, target_s = "wq_w", "wq_s"
+                            elif proj == "k_proj": target_w, target_s = "wk_w", "wk_s"
+                            elif proj == "v_proj": target_w, target_s = "wv_w", "wv_s"
+                            elif proj == "o_proj": target_w, target_s = "wo_w", "wo_s"
+                        elif module == "mlp":
+                            if proj == "gate_proj": target_w, target_s = "w1_w", "w1_s"
+                            elif proj == "up_proj": target_w, target_s = "w3_w", "w3_s"
+                            elif proj == "down_proj": target_w, target_s = "w2_w", "w2_s"
+                            
+                        if target_w:
+                            if is_packed:
+                                packed = f.get_tensor(key)
+                                scales = f.get_tensor(key.replace("_packed", "_scales"))
+                                w, s = _upload_quantized(model.backend, packed, scales)
+                            else:
+                                tensor = f.get_tensor(key)
+                                w, s = _quantize_and_upload(model.backend, tensor)
+                            
+                            setattr(layer, target_w, w)
+                            setattr(layer, target_s, s)
                             
                     elif module == "input_layernorm":
                         # FP32 upload
-                        layer.attn_norm = _upload_fp32(model.backend, tensor)
+                        layer.attn_norm = _upload_fp32(model.backend, f.get_tensor(key))
                     elif module == "post_attention_layernorm":
-                        layer.ffn_norm = _upload_fp32(model.backend, tensor)
+                        layer.ffn_norm = _upload_fp32(model.backend, f.get_tensor(key))
                         
                 elif parts[0] == "model" and parts[1] == "norm":
                     # Final norm
                     tensor = f.get_tensor(key)
                     model.norm = _upload_fp32(model.backend, tensor)
+                
+                elif parts[0] == "model" and parts[1] == "embed_tokens":
+                    # Embeddings
+                    # Keep on CPU as numpy array for v0.1
+                    tensor = f.get_tensor(key)
+                    if tensor.dtype != np.float32:
+                        tensor = tensor.astype(np.float32)
+                    model.embed_tokens = tensor
                     
                 elif parts[0] == "lm_head":
                     # Output head
-                    # Usually kept in FP16 or quantized? Let's quantize for memory
-                    tensor = f.get_tensor(key)
-                    w, s = _quantize_and_upload(model.backend, tensor)
+                    if is_packed:
+                        packed = f.get_tensor(key)
+                        scales = f.get_tensor(key.replace("_packed", "_scales"))
+                        w, s = _upload_quantized(model.backend, packed, scales)
+                    else:
+                        tensor = f.get_tensor(key)
+                        w, s = _quantize_and_upload(model.backend, tensor)
                     model.output_w = w; model.output_s = s
+
+def _upload_quantized(backend, packed, scales):
+    rows, cols_packed = packed.shape
+    t_w = orchard_core.Tensor(backend, [rows, cols_packed], orchard_core.DType.Int8)
+    t_w.copy_from_host(packed)
+    
+    rows, cols_scales = scales.shape
+    t_s = orchard_core.Tensor(backend, [rows, cols_scales], orchard_core.DType.Float16)
+    t_s.copy_from_host(scales)
+    
+    return t_w, t_s
 
 def _quantize_and_upload(backend, tensor_np):
     # tensor_np is (Out, In)
