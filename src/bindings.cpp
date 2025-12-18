@@ -35,6 +35,9 @@ PYBIND11_MODULE(orchard_core, m) {
         .def("run_gemv_q4_0", [](MetalBackend& self, Tensor& weights, Tensor& scales, Tensor& input, Tensor& output, uint32_t K, uint32_t N) {
             self.run_gemv_q4_0(weights.data(), scales.data(), input.data(), output.data(), K, N);
         })
+        .def("run_gemm_q4_0", [](MetalBackend& self, Tensor& weights, Tensor& scales, Tensor& input, Tensor& output, uint32_t K, uint32_t N, uint32_t B) {
+            self.run_gemm_q4_0(weights.data(), scales.data(), input.data(), output.data(), K, N, B);
+        })
         .def("run_add", [](MetalBackend& self, Tensor& a, Tensor& b, Tensor& c, uint32_t size) {
             self.run_add(a.data(), b.data(), c.data(), size);
         })

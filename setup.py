@@ -28,11 +28,14 @@ orchard_core = Extension(
 )
 
 setup(
-    name="orchard",
-    version="0.1.0",
+    name="orchard-llm",
+    version="0.1.1",
     description="High-performance LLM runtime for Apple Silicon",
     author="Orchard Team",
     packages=["orchard"],
+    package_data={
+        "orchard": ["kernels/*.metal"],
+    },
     ext_modules=[orchard_core],
     install_requires=[
         "numpy",

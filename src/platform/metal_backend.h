@@ -39,6 +39,9 @@ public:
     void run_gemv_q4_0(void* weights, void* scales, void* input, void* output, 
                       uint32_t K, uint32_t N);
 
+    void run_gemm_q4_0(void* weights, void* scales, void* input, void* output, 
+                      uint32_t K, uint32_t N, uint32_t B);
+
     // Element-wise ops
     void run_add(void* a, void* b, void* c, uint32_t size);
     void run_mul(void* a, void* b, void* c, uint32_t size);

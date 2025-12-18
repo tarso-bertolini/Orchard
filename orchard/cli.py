@@ -150,7 +150,8 @@ def main():
             from orchard.model import Llama
             model = Llama(args.model)
             print(f"\nGenerating response to: '{args.prompt}'\n")
-            model.generate(args.prompt)
+            results = model.generate_batch([args.prompt])
+            print(results[0])
         except Exception as e:
             print(f"Error running model: {e}")
             import traceback

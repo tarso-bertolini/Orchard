@@ -18,6 +18,7 @@ struct MetalBackend::Impl {
     id<MTLComputePipelineState> ropePSO;
     id<MTLComputePipelineState> gemvInt8PSO;
     id<MTLComputePipelineState> gemvInt4PSO;
+    id<MTLComputePipelineState> gemmInt4PSO;
     id<MTLComputePipelineState> addPSO;
     id<MTLComputePipelineState> mulPSO;
     id<MTLComputePipelineState> siluPSO;
@@ -66,12 +67,13 @@ void MetalBackend::initialize(const std::string& resource_path) {
     std::string source_rope = read_file("rope.metal");
     std::string source_gemv = read_file("gemv_int8.metal");
     std::string source_gemv4 = read_file("gemv_int4.metal");
+    std::string source_gemm4 = read_file("gemm_int4.metal");
     std::string source_ew = read_file("elementwise.metal");
     std::string source_sm = read_file("softmax.metal");
     std::string source_emb = read_file("embedding.metal");
     
     // Combine sources
-    std::string combined_source = source + "\n" + source_simd + "\n" + source_rms + "\n" + source_rope + "\n" + source_gemv + "\n" + source_gemv4 + "\n" + source_ew + "\n" + source_sm + "\n" + source_emb;
+    std::string combined_source = source + "\n" + source_simd + "\n" + source_rms + "\n" + source_rope + "\n" + source_gemv + "\n" + source_gemv4 + "\n" + source_gemm4 + "\n" + source_ew + "\n" + source_sm + "\n" + source_emb;
     
     NSString* librarySource = [NSString stringWithUTF8String:combined_source.c_str()];
     MTLCompileOptions* options = [[MTLCompileOptions alloc] init];
@@ -131,6 +133,12 @@ void MetalBackend::initialize(const std::string& resource_path) {
     id<MTLFunction> kernelFunctionGemv4 = [library newFunctionWithName:@"gemv_q4_0"];
     if (kernelFunctionGemv4) {
         pImpl->gemvInt4PSO = [pImpl->device newComputePipelineStateWithFunction:kernelFunctionGemv4 error:&error];
+    }
+
+    // Load GEMM INT4 Kernel
+    id<MTLFunction> kernelFunctionGemm4 = [library newFunctionWithName:@"gemm_q4_0"];
+    if (kernelFunctionGemm4) {
+        pImpl->gemmInt4PSO = [pImpl->device newComputePipelineStateWithFunction:kernelFunctionGemm4 error:&error];
     }
 
     // Load Elementwise Kernels
@@ -367,6 +375,33 @@ void MetalBackend::run_gemv_q4_0(void* weights, void* scales, void* input, void*
 
     // Dispatch 1 thread per output element (N)
     MTLSize gridSize = MTLSizeMake(N, 1, 1);
+    MTLSize threadgroupSize = MTLSizeMake(std::min((uint32_t)N, 128u), 1, 1);
+
+    [computeEncoder dispatchThreads:gridSize threadsPerThreadgroup:threadgroupSize];
+    [computeEncoder endEncoding];
+
+    [commandBuffer commit];
+    [commandBuffer waitUntilCompleted];
+}
+
+void MetalBackend::run_gemm_q4_0(void* weights, void* scales, void* input, void* output, 
+                                uint32_t K, uint32_t N, uint32_t B) {
+    if (!pImpl->commandQueue || !pImpl->gemmInt4PSO) return;
+
+    id<MTLCommandBuffer> commandBuffer = [pImpl->commandQueue commandBuffer];
+    id<MTLComputeCommandEncoder> computeEncoder = [commandBuffer computeCommandEncoder];
+
+    [computeEncoder setComputePipelineState:pImpl->gemmInt4PSO];
+    [computeEncoder setBuffer:(__bridge id<MTLBuffer>)weights offset:0 atIndex:0];
+    [computeEncoder setBuffer:(__bridge id<MTLBuffer>)scales offset:0 atIndex:1];
+    [computeEncoder setBuffer:(__bridge id<MTLBuffer>)input offset:0 atIndex:2];
+    [computeEncoder setBuffer:(__bridge id<MTLBuffer>)output offset:0 atIndex:3];
+    [computeEncoder setBytes:&K length:sizeof(uint32_t) atIndex:4];
+    [computeEncoder setBytes:&N length:sizeof(uint32_t) atIndex:5];
+    [computeEncoder setBytes:&B length:sizeof(uint32_t) atIndex:6];
+
+    // Grid: (N, B)
+    MTLSize gridSize = MTLSizeMake(N, B, 1);
     MTLSize threadgroupSize = MTLSizeMake(std::min((uint32_t)N, 128u), 1, 1);
 
     [computeEncoder dispatchThreads:gridSize threadsPerThreadgroup:threadgroupSize];

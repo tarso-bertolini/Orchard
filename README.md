@@ -1,106 +1,102 @@
-# Orchard
+# 🍎 Orchard
 
-**The High-Performance LLM Runtime for Apple Silicon.**
+**High-Performance LLM Runtime for Apple Silicon**
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Platform: macOS](https://img.shields.io/badge/Platform-macOS%20(Apple%20Silicon)-black.svg)](https://www.apple.com/mac/)
-[![Python: 3.9+](https://img.shields.io/badge/Python-3.9+-blue.svg)](https://www.python.org/)
-[![Metal: Native](https://img.shields.io/badge/Metal-Native-red.svg)](https://developer.apple.com/metal/)
+[![PyPI Version](https://img.shields.io/pypi/v/orchard-llm?color=blue&style=flat-square)](https://pypi.org/project/orchard-llm/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
+[![Platform: macOS](https://img.shields.io/badge/Platform-macOS%20(Apple%20Silicon)-black.svg?style=flat-square)](https://www.apple.com/mac/)
+[![Metal: Native](https://img.shields.io/badge/Metal-Native-red.svg?style=flat-square)](https://developer.apple.com/metal/)
 
-Orchard is a specialized inference engine designed to extract maximum performance from Apple Silicon (M1/M2/M3/M4) chips. By bypassing generic frameworks and targeting the Metal API directly, Orchard achieves state-of-the-art speed and efficiency for local Large Language Model (LLM) inference.
-
-> **"The engine is the car."** — Orchard runs models closer to the metal than ever before.
+**Orchard** is a specialized inference engine built from the ground up to extract maximum performance from Apple Silicon (M1/M2/M3/M4) chips. By bypassing generic frameworks and targeting the Metal API directly with custom kernels, Orchard achieves state-of-the-art speed and efficiency for local Large Language Model (LLM) inference.
 
 ---
 
-## Key Features
+## 🚀 Key Features
 
-*   **Apple Silicon Native**: Built directly on Metal (Objective-C++) for zero-overhead GPU access. No PyTorch, no TensorFlow, just raw compute.
-*   **4-bit Quantization**: Custom `INT4` kernels allow running massive models on consumer hardware (e.g., 7B models on 8GB RAM).
-*   **Blazing Fast**: Up to **82x faster** than CPU inference for quantized workloads.
-*   **Zero-Copy Architecture**: Unified memory architecture is fully exploited—CPU and GPU share memory pointers where possible.
-*   **Pythonic Control**: A lightweight, high-level Python API controls the heavy lifting done in C++.
+- **Apple Silicon Native**: Built directly on Metal (Objective-C++) for zero-overhead GPU access. No PyTorch, no TensorFlow—just raw compute.
+- **4-bit Quantization**: Custom `INT4` kernels allow running massive models on consumer hardware (e.g., 7B models on 8GB RAM) with minimal accuracy loss.
+- **Blazing Fast**: Up to **82x faster** than CPU inference for quantized workloads.
+- **Zero-Copy Architecture**: Fully exploits Apple's Unified Memory Architecture (UMA), sharing memory pointers between CPU and GPU where possible.
+- **Pythonic Control**: A lightweight, high-level Python API controls the heavy lifting done in C++.
 
 ---
 
-## Installation
+## 📦 Installation
 
-### Prerequisites
-*   **macOS 13.0+** (Ventura or later)
-*   **Apple Silicon** (M1/M2/M3/M4)
-*   **Python 3.9+**
-*   **Xcode Command Line Tools** (`xcode-select --install`)
-
-### Quick Install (From Source)
+### From PyPI (Recommended)
 
 ```bash
-# 1. Clone the repository
+pip install orchard-llm
+```
+
+### From Source
+
+Prerequisites:
+*   macOS 13.0+ (Ventura or later)
+*   Apple Silicon (M1/M2/M3/M4)
+*   Python 3.9+
+*   Xcode Command Line Tools (`xcode-select --install`)
+
+```bash
 git clone https://github.com/tarso-bertolini/Orchard.git
 cd Orchard
-
-# 2. Create a virtual environment (Recommended)
-python3 -m venv .venv
-source .venv/bin/activate
-
-# 3. Install
 pip install .
 ```
 
 ---
 
-## CLI Usage
+## ⚡ Quick Start
+
+### CLI Usage
 
 Orchard comes with a powerful CLI to manage your local AI environment.
 
-### 1. Check System Compatibility
-See what your hardware can handle.
+**1. Check System Compatibility**
 ```bash
 orchard info
 ```
 
-### 2. Download Models
-Interactive downloader for popular models (Llama-2, Mistral, TinyLlama).
+**2. Download & Run a Model**
 ```bash
+# Download a model (e.g., Llama-2-7b)
 orchard download
-```
 
-### 3. Optimize Models (New!)
-Pre-quantize models to 4-bit format for **instant loading** and reduced disk usage.
-```bash
+# Optimize it for Apple Silicon (4-bit quantization)
 orchard optimize --model models/Llama-2-7b-chat --output models/Llama-2-7b-chat-opt
+
+# Chat!
+orchard run --model models/Llama-2-7b-chat-opt --prompt "Why is the sky blue?"
 ```
 
-### 4. Run Inference
-Chat with your model immediately.
-```bash
-orchard run --model models/Llama-2-7b-chat-opt --prompt "Explain quantum computing like I'm 5."
-```
-
----
-
-## Python API
+### Python API
 
 Integrate Orchard into your own applications with just a few lines of code.
 
 ```python
 from orchard import Llama
 
-# Load a model (supports Hugging Face format)
-# If the model is not optimized, it will be quantized on-the-fly.
+# Load an optimized model
 model = Llama("models/Llama-2-7b-chat-opt")
 
 # Generate text
-print("Generating...")
-model.generate(
-    prompt="Write a haiku about apples.",
+prompts = [
+    "Write a haiku about coding.",
+    "Explain quantum computing in one sentence."
+]
+
+results = model.generate_batch(
+    prompts=prompts,
     max_tokens=50,
     temperature=0.7
 )
+
+for prompt, result in zip(prompts, results):
+    print(f"Prompt: {prompt}\nResult: {result}\n")
 ```
 
 ---
 
-## Performance Benchmarks
+## 📊 Performance
 
 **Device:** Apple M2 (Unified Memory)
 
@@ -115,7 +111,7 @@ model.generate(
 
 ---
 
-## Architecture
+## 🏗 Architecture
 
 Orchard uses a hybrid execution model to balance flexibility and performance.
 
@@ -139,14 +135,9 @@ graph TD
     end
 ```
 
-### Memory Model
-*   **Weights**: Stored in **VRAM** (GPU) as packed INT4 textures.
-*   **KV Cache**: Managed in **RAM** (CPU) and streamed to GPU on-demand (Hybrid Strategy for v0.1).
-*   **Activations**: Transient GPU buffers.
-
 ---
 
-## Roadmap
+## 🗺 Roadmap
 
 - [x] **Phase 1: Metal Viability** (Kernels for MatMul, Softmax, RMSNorm)
 - [x] **Phase 2: Runtime Core** (C++ Backend, Tensor Abstraction)
@@ -156,22 +147,22 @@ graph TD
 
 ---
 
-## Contributing
+## 🤝 Contributing
 
-Orchard is an open exploration of high-performance computing on Apple Silicon. Contributions, issues, and PRs are welcome!
+Orchard is an open exploration of high-performance computing on Apple Silicon. Contributions are welcome!
 
-1.  Fork the repo.
+1.  Fork the repository.
 2.  Create your feature branch (`git checkout -b feature/amazing-feature`).
-3.  Commit your changes.
-4.  Push to the branch.
+3.  Commit your changes (`git commit -m 'Add some amazing feature'`).
+4.  Push to the branch (`git push origin feature/amazing-feature`).
 5.  Open a Pull Request.
 
 ---
 
-## License
+## 📄 License
 
-MIT License. See [LICENSE](LICENSE) for details.
+Distributed under the MIT License. See `LICENSE` for more information.
 
 ---
 
-*Built in Cupertino (and beyond).*
+*Built with 🍎 in Cupertino (and beyond).*

@@ -146,3 +146,110 @@ def _upload_fp32(backend, tensor_np):
     t = orchard_core.Tensor(backend, list(shape), orchard_core.DType.Float32)
     t.copy_from_host(tensor_np)
     return t
+
+def load_lora_adapter(model, adapter_path):
+    print(f"Loading LoRA adapter from {adapter_path}...")
+    
+    # 1. Load Config
+    config_path = os.path.join(adapter_path, "adapter_config.json")
+    with open(config_path, "r") as f:
+        config = json.load(f)
+        
+    r = config.get("r", 8)
+    alpha = config.get("lora_alpha", 16)
+    scaling = alpha / r
+    
+    # 2. Find Weights
+    files = glob.glob(os.path.join(adapter_path, "*.safetensors"))
+    if not files:
+        # Try bin
+        files = glob.glob(os.path.join(adapter_path, "*.bin"))
+        if not files:
+            raise FileNotFoundError("No adapter weights found")
+            
+    # 3. Load Weights
+    from .model import LoraAdapter
+    
+    for file in files:
+        print(f"Processing adapter {os.path.basename(file)}...")
+        # Use safe_open or torch.load depending on file type
+        # Assuming safetensors for now as it's standard
+        if file.endswith(".safetensors"):
+            with safe_open(file, framework="numpy", device="cpu") as f:
+                keys = f.keys()
+                for key in keys:
+                    # Parse key
+                    # base_model.model.model.layers.0.self_attn.q_proj.lora_A.weight
+                    parts = key.split('.')
+                    
+                    # Find layer index
+                    try:
+                        if "layers" in parts:
+                            layer_idx_pos = parts.index("layers") + 1
+                            layer_idx = int(parts[layer_idx_pos])
+                        else:
+                            continue
+                    except (ValueError, IndexError):
+                        continue
+                        
+                    if layer_idx >= len(model.layers):
+                        continue
+                        
+                    layer = model.layers[layer_idx]
+                    
+                    # Find module
+                    # self_attn.q_proj or mlp.gate_proj
+                    try:
+                        module_part = parts[layer_idx_pos + 1]
+                        proj_part = parts[layer_idx_pos + 2]
+                    except IndexError:
+                        continue
+                    
+                    target_module = None
+                    if module_part == "self_attn":
+                        if proj_part == "q_proj": target_module = "wq"
+                        elif proj_part == "k_proj": target_module = "wk"
+                        elif proj_part == "v_proj": target_module = "wv"
+                        elif proj_part == "o_proj": target_module = "wo"
+                    elif module_part == "mlp":
+                        if proj_part == "gate_proj": target_module = "w1"
+                        elif proj_part == "up_proj": target_module = "w3"
+                        elif proj_part == "down_proj": target_module = "w2"
+                        
+                    if not target_module:
+                        continue
+                        
+                    # Check if A or B
+                    is_A = "lora_A" in parts
+                    is_B = "lora_B" in parts
+                    
+                    if not (is_A or is_B):
+                        continue
+                        
+                    # Get or create adapter
+                    if target_module not in layer.lora_adapters:
+                        layer.lora_adapters[target_module] = LoraAdapter(model.backend, r, alpha, scaling)
+                    
+                    adapter = layer.lora_adapters[target_module]
+                    tensor = f.get_tensor(key)
+                    
+                    # Upload
+                    # A: [r, In] -> Transpose to [In, r]
+                    # B: [Out, r] -> Transpose to [r, Out]
+                    
+                    if is_A:
+                        # tensor is [r, In]
+                        # We want [In, r]
+                        tensor_t = tensor.T.astype(np.float32)
+                        t = orchard_core.Tensor(model.backend, list(tensor_t.shape), orchard_core.DType.Float32)
+                        t.copy_from_host(tensor_t)
+                        adapter.lora_A = t
+                    elif is_B:
+                        # tensor is [Out, r]
+                        # We want [r, Out]
+                        # Also apply scaling here!
+                        tensor_scaled = tensor.T.astype(np.float32) * scaling
+                        t = orchard_core.Tensor(model.backend, list(tensor_scaled.shape), orchard_core.DType.Float32)
+                        t.copy_from_host(tensor_scaled)
+                        adapter.lora_B = t
+
